@@ -1,0 +1,918 @@
+--Feature 1______________________________________________________________________________________SONAL JAYKUMAR INGLE______
+
+CREATE OR REPLACE PROCEDURE add_person (
+	add_name in varchar ,
+	add_address in varchar, 
+	add_zip in varchar,
+	add_phone in varchar)
+	
+IS
+per_exists int;
+add_verify int;
+h_id houses.hid%type;
+x_mid3 number;
+x_mid2 number;
+		
+BEGIN
+
+select count(*) into per_exists from person where  p_name = add_name and phone = add_phone;
+select count(*) into add_verify from Houses where address = add_address and zip = add_zip;
+
+--check if a person already exists with same name and phone number
+IF per_exists = 1 THEN
+    BEGIN
+	dbms_output.put_line('person already exists!');
+    END;
+
+ELSE
+    BEGIN
+	x_mid3 := mid_seq3.nextval;
+	x_mid2 := mid_seq2.nextval;
+	
+	IF add_verify = 1 THEN
+        select hid into h_id from houses where address = add_address;
+--		insert row into person
+		INSERT INTO person VALUES (x_mid3, h_id, add_name,add_phone, NULL);
+		dbms_output.put_line('person inserted with existing house');
+		dbms_output.put_line( 'Details are :: Person Id: '  || x_mid3 || 'House Id: ' || h_id || 'Address: ' || add_address || 'Zipcode: ' || add_zip || ' Name:  ' || add_name || 'Phone number:  ' || add_phone || 'Status is:  ' || 'NULL');
+	
+    ELSE
+--	insert a row into house table and person table
+	INSERT INTO houses VALUES (x_mid2, add_address, add_zip);
+    select hid into h_id from houses where address = add_address;
+	INSERT INTO person VALUES (x_mid3, h_id, add_name,add_phone, NULL);
+	dbms_output.put_line('New house created with the newly assigned house id ' || h_id || ' and a person inserted with the new person id' || x_mid3);
+	END IF;
+
+    END;	
+END IF;
+
+EXCEPTION 
+    WHEN NO_DATA_FOUND THEN
+    dbms_output.put_line('No data found: Please try to insert information again!');	
+END;
+
+/
+
+--TEST CASE1
+set serveroutput on;
+exec add_person('Rohan', '1025 Howland Sq', '21227', '6672321002'); 		--Success "Person already exists"
+--OUTPUT:
+person already exists!
+
+--TEST CASE2
+set serveroutput on;
+exec add_person('Viza', '1025 Howland Sq', '21227', '6602321011');		--Success row inserted in table Person
+--OUTPUT:
+person inserted with existing house
+Details are :: Person Id: 25House Id: 1Address: 1025 Howland SqZipcode: 21227 Name:  VizaPhone number:  6602321011Status is:  NULL
+
+TEST CASE3
+set serveroutput on;
+exec add_person('Vani', '1021 Algate Sq', '21232', '6682321023');		--Success row inserted in table Houses and Person
+--OUTPUT:
+New house created with the newly assigned house id 10 and a person inserted with the new person id 26
+
+
+--Feature2________________________________________________________________________________________________SONAL JAYKUMAR INGLE______
+
+CREATE OR REPLACE PROCEDURE checkperson_status IS
+per_name person.p_name%type;
+per_phone person.phone%type;
+per_status person.status%type;
+
+CURSOR C1 IS 
+    SELECT p_name, phone, status
+	FROM person
+	WHERE status = 1;
+
+CURSOR C2 IS
+    SELECT distinct p.p_name, p.phone, p.status
+	FROM person p, person p1, houses h
+	WHERE p.hid = p1.hid and p.pid != p1.pid and p.status = 0;
+BEGIN
+DBMS_OUTPUT.PUT_LINE('Peoples Name and Phone Number whose current status is Positive');
+DBMS_OUTPUT.PUT_LINE('Person Name  ' || 'Person Phone Number  ' || 'Person Status' );
+OPEN C1;
+LOOP
+FETCH C1 INTO per_name, per_phone, per_status;
+EXIT WHEN C1%NOTFOUND;
+DBMS_OUTPUT.PUT_LINE(per_name ||'          ' || per_phone || '            ' || per_status);
+END LOOP;
+CLOSE C1;
+
+OPEN C2;
+DBMS_OUTPUT.PUT_LINE('Details of person living in the same house');
+LOOP
+FETCH C2 INTO per_name, per_phone, per_status;
+EXIT WHEN C2%NOTFOUND;
+DBMS_OUTPUT.PUT_LINE(per_name ||'          ' || per_phone || '            ' || per_status);
+END LOOP;
+CLOSE C2;
+END;
+
+/
+
+SET SERVEROUTPUT ON;
+EXEC checkperson_status();
+--OUTPUT:
+Peoples Name and Phone Number whose current status is Positive
+Person Name  Person Phone Number  Person Status
+Vickey          6672321004            1
+Vaishak          6672321005            1
+Vishal          6672321006            1
+Ritviz          8772321004            1
+Mithila          8972321009            1
+Diya          6012321001            1
+Bob          8672321099            1
+Lucky          6872321002            1
+Details of person living in the same house
+Vikas          6672321003            0
+Marshal          6772321777            0
+Rohan          6672321002            0
+Helen          8872371001            0
+
+
+PL/SQL procedure successfully completed.
+
+
+
+--Feature 3______________________________________________________________________________________SHUBHI SHRIVASTAVA____________
+
+CREATE OR replace PROCEDURE add_test(p_id     INT, 
+                                     testdate DATE, 
+                                     t_result INT) 
+IS 
+  v_count1 INT; 
+  v_count2 INT; 
+  v_tdate  DATE; 
+BEGIN 
+    SELECT Count(*) 
+    INTO   v_count1 
+    FROM   person 
+    WHERE  pid = p_id; 
+
+    IF v_count1 = 0 THEN 
+      dbms_output.Put_line('No such person'); 
+    ELSE 
+      dbms_output.Put_line('Person exists'); 
+
+      SELECT Count(*) 
+      INTO   v_count2 
+      FROM   tests 
+      WHERE  pid = p_id;
+
+      IF v_count2 = 0 THEN 
+        dbms_output.Put_line('No existing test'); 
+        INSERT INTO tests VALUES( test_sequence.nextval, p_id, testdate, t_result); 
+      ELSE 
+        dbms_output.Put_line('test row exists for person'); 
+
+        SELECT Max(t_date) 
+        INTO   v_tdate 
+        FROM   tests 
+        WHERE  pid = p_id and t_date <=testdate; 
+
+        IF v_tdate = testdate THEN 
+          UPDATE tests 
+          SET    res = t_result 
+          WHERE  pid = p_id 
+                 AND t_date = testdate; 
+        ELSIF v_tdate < testdate THEN 
+          UPDATE tests 
+          SET    res = t_result,
+         t_date = testdate
+          WHERE  pid = p_id 
+                 AND v_tdate < testdate; 
+    ELSE 
+          dbms_output.Put_line('result for latest date available');
+        END IF; 
+      END IF; 
+    END IF; 
+    EXCEPTION 
+        WHEN no_data_found THEN
+            dbms_output.put_line('No such person!');
+        WHEN too_many_rows THEN
+            dbms_output.put_line('Too many rows!');
+END; 
+
+--invalid id 
+set SERVEROUTPUT ON
+EXEC add_test(100, DATE '2020-08-08', 0); 
+--no existing test for newly added person 
+INSERT INTO person VALUES 
+            ( 
+                        30, 
+                        1, 
+                        'Harry', 
+                        '6672321002', 
+                        0
+            ); 
+
+EXEC add_test(30, DATE '2020-08-08', 1); 
+SELECT * 
+FROM   person; --to check the inserted row in Person 
+SELECT * 
+FROM   tests; --to check the inserted row in Tests 
+
+--normal cases 
+EXEC add_test(30, DATE '2020-10-08', 0); 
+SELECT * 
+FROM   person; 
+SELECT * 
+FROM   tests; 
+
+DELETE 
+FROM   tests 
+WHERE  pid=30; 
+DELETE 
+FROM   person 
+WHERE  pid=30;
+
+
+--Feature 4______________________________________________________________________________________SHUBHI SHRIVASTAVA____________
+
+CREATE OR replace PROCEDURE list_people(x interval day TO second) 
+IS 
+  CURSOR c1 IS 
+    SELECT p_name, 
+           phone 
+    FROM   person 
+    WHERE  status =1; 
+
+CURSOR c2 IS 
+  SELECT DISTINCT p2.p_name, 
+                  p2.phone 
+  FROM            person p1, 
+                  person p2, 
+                  person_flight pf1, 
+                  person_flight pf2, 
+                  flights f
+  WHERE           p1.status = 1 
+  AND             p2.status = 0 
+  AND             pf1.fid = pf2.fid 
+  AND             pf1.pid = p1.pid 
+  AND             pf2.pid = p2.pid
+  AND             pf2.fid = f.fid
+  AND             f.f_date BETWEEN SYSDATE-x AND SYSDATE; 
+
+BEGIN 
+  dbms_output.Put_line('List of people tested positive '); 
+  FOR r IN c1 
+  LOOP 
+    dbms_output.Put_line('Name: ' 
+    || r.p_name 
+    || ' ,Phone: ' 
+    || r.phone); 
+  END LOOP; 
+  dbms_output.Put_line('List of people travelling in same flight as above: '); 
+  FOR r IN c2 
+  LOOP 
+    EXIT 
+  WHEN c2%NOTFOUND; 
+    dbms_output.Put_line('Name: ' 
+    || r.p_name 
+    || ' ,Phone: ' 
+    || r.phone); 
+  END LOOP;
+  dbms_output.Put_line('-----end of results---- '); 
+  
+END; 
+--Testing 
+SET serveroutput ON; 
+EXEC list_people(interval '1' day);
+EXEC list_people(interval '10' day);
+EXEC list_people(interval '90' day);
+
+
+----Feature 5--------------------------------------------------------------------------------------------Vikas Matadha Rajashekharaiah---------------------------
+
+create sequence event_sequence
+set serveroutput ON; 
+CREATE OR replace PROCEDURE Add_event(v_ename    IN EVENTS.e_name%TYPE, 
+                                      v_edate    IN EVENTS.e_date%TYPE, 
+                                      v_eaddress IN EVENTS.e_address%TYPE) 
+IS 
+  v_count INT; 
+  v_eid   INT; 
+BEGIN 
+    SELECT Count(*) 
+    INTO   v_count 
+    FROM   EVENTS 
+    WHERE  e_date = v_edate 
+           AND e_name = v_ename; 
+
+    IF v_count = 1 THEN 
+      SELECT eid 
+      INTO   v_eid 
+      FROM   EVENTS 
+      WHERE  e_date = v_edate 
+             AND e_name = v_ename; 
+
+      dbms_output.Put_line('Event exits'); 
+    ELSE 
+      INSERT INTO EVENTS 
+      VALUES      (event_sequence.NEXTVAL, 
+                   v_ename, 
+                   v_edate, 
+                   v_eaddress); 
+
+      dbms_output.Put_line('Event Created'); 
+    END IF; 
+EXCEPTION 
+  WHEN no_data_found THEN 
+             dbms_output.Put_line('No Data Found'); 
+END; 
+
+/ 
+SET serveroutput ON; 
+--TESTS 
+--Case 1: Already existing event 
+exec Add_event ('victor', DATE '2011-09-05', '4142 greenville' ); 
+--Case 2: New event 
+exec Add_event ('testEvent', DATE '2011-04-07', '4142 Howard'); 
+ROLLBACK 
+
+exec add_event ('victor', date '2011-09-05', '4142 greenville' ); ------------------------------------success-- already existing event
+
+exec add_event ('victore', date '2011-04-06', '4142 Howland'); --------------------------------------success---new event
+
+--Feature 6--------------------------------------------------------------------------------------------------Vikas Matadha Rajashekharaiah-----------------------
+
+
+set serveroutput ON; 
+CREATE OR replace PROCEDURE List_positiveevent(number_of_days IN NUMBER) 
+IS 
+  CURSOR c1 IS 
+    SELECT distinct p_name, 
+           phone 
+    FROM   person 
+    WHERE  person.status = 1; 
+  CURSOR c2 IS 
+    SELECT distinct p2.p_name, 
+           p2.phone 
+    FROM   person p1, 
+           person p2, 
+           person_event ep1, person_event ep2,
+           EVENTS e            
+    WHERE  e.eid = ep2.eid
+           AND ep1.eid = ep2.eid
+           AND p1.pid = ep1.pid AND p2.pid = ep2.pid
+           AND e.e_date - SYSDATE <= number_of_days 
+           AND p1.status = 1 AND p2.status = 0;  
+           
+  v_p_name  person.p_name%TYPE; 
+  v_phone   person.phone%TYPE; 
+  p1_p_name person.p_name%TYPE; 
+  p1_phone  person.phone%TYPE; 
+  
+BEGIN 
+    OPEN c1; 
+    LOOP 
+        FETCH c1 INTO v_p_name, v_phone; 
+        EXIT WHEN c1%NOTFOUND; 
+        dbms_output.Put_line('the person name is ' 
+                             ||v_p_name 
+                             ||' phone number is ' 
+                             || v_phone);
+    end loop;
+    close c1;
+        
+    OPEN c2; 
+    LOOP 
+        FETCH c2 INTO p1_p_name, p1_phone; 
+        EXIT WHEN c2%NOTFOUND;
+        IF p1_p_name IS NOT NULL AND p1_p_name <> v_p_name AND p1_phone <> v_phone THEN 
+            dbms_output.Put_line('the person associated is ' 
+                                   ||p1_p_name 
+                                   ||' ,phone number is   ' 
+                                   ||p1_phone); 
+        --ELSE 
+              --dbms_output.Put_line('no such person'); 
+        END IF;   
+    END LOOP; 
+    CLOSE c2; 
+END; 
+
+---Testing
+exec list_positiveevent(1); 
+exec list_positiveevent(10); 
+exec list_positiveevent(30); 
+
+
+
+--Feature 7____________________________________________________________________________________________KIRUBL TOLOSA____________
+
+CREATE OR REPLACE TYPE phoneListType as varray(10) of INT;
+
+CREATE OR REPLACE PROCEDURE  insertPersonsAtEvent(plist personsListType, e_id INTEGER) 
+    IS     
+    evnt Events.eid%type;
+    psn Person.pid%type;
+    psn_evnt number;
+BEGIN
+    -- Checking if event exists in the event table.
+    SELECT Count(*) into evnt FROM Events Where eid = e_id;
+        IF evnt = 0 THEN 
+            dbms_output.put_line('Event  ' || e_id ||'  does not exist'); 
+        ELSE 
+            -- Checking if Persons in the list exist in the person table. 
+            FOR i IN 1..plist.count LOOP        
+                SELECT Count(*) INTO psn FROM Person WHERE pid = plist(i);
+                IF psn = 0 THEN
+                    dbms_output.put_line('Person  ' || plist(i) || '  does not exist');
+                ELSE                    
+                    -- Writing the person-event record if the record doesn't exist in Person_Event table.                            
+                    SELECT count(*) INTO psn_evnt FROM Person_Event WHERE pid = plist(i) AND eid = e_id;       
+                    IF psn_evnt <> 0 THEN
+                        dbms_output.put_line('No need to insert Person: '|| plist(i) || '  Event: ' || e_id || '  combination!');
+                    ELSE
+                        INSERT INTO Person_Event VALUES (plist(i), e_id);  
+                        dbms_output.put_line('Inserted Person  ' || plist(i) || '  and Event:  ' || e_id || '  combination to Person_Event table!');
+                    END IF;                       
+                END IF;
+            END LOOP;    
+        END IF;
+END;
+ 
+SET SERVEROUTPUT ON;
+--TESTS
+--Case 1: Event doesn't exist.
+EXEC insertPersonsAtEvent(personsListType(12, 67, 20), 320);
+
+--Case 2: Some persons don't exist and a combination exists.
+EXEC insertPersonsAtEvent(personsListType(11, 33, 44), 311);
+
+--Case 3: Person and Event esist, but combination doesn't exist. 
+EXEC insertPersonsAtEvent(personsListType(17, 18, 19), 311);
+
+ROLLBACK;
+
+
+--Feature 8___________________________________________________________________________________________KIRUBL TOLOSA____________
+
+CREATE OR REPLACE PROCEDURE  printTestResults(p_pname VARCHAR, p_phone VARCHAR) 
+    IS  
+    CURSOR Curs IS
+        SELECT t_date, res FROM Tests 
+        WHERE pid IN (SELECT pid FROM Person Where p_name = p_pname AND phone = p_phone)
+        ORDER BY t_date DESC;
+    p_id NUMBER;
+    test_count NUMBER;
+    t_date Tests.t_date%type;
+    t_result Tests.res%type;   
+BEGIN 
+    -- Getting the id of the person
+    SELECT pid into p_id FROM Person Where p_name = p_pname AND phone = p_phone;
+    SELECT count(*) into test_count FROM Tests Where pid = p_id;
+    IF test_count = 0 THEN
+        dbms_output.put_line('Person doesnt have a test result on record!');   
+    ELSE    
+        OPEN Curs;    
+        -- Printing all the results of the person in the Tests table.
+        LOOP 
+            FETCH Curs INTO t_date, t_result;
+            EXIT WHEN Curs%NotFound;            
+            dbms_output.put_line('Test Date: ' || t_date || '   |   Result:  ' || t_result);
+        END LOOP;
+        CLOSE Curs;
+    END IF;
+    EXCEPTION 
+        WHEN no_data_found THEN
+            dbms_output.put_line('No such person!');
+        WHEN too_many_rows THEN
+            dbms_output.put_line('Multiple people with the name and phone combination exist!');   
+END;
+
+
+SET SERVEROUTPUT ON;
+--TESTS
+--Case 1: Person does not exist.
+EXEC printTestResults('Kirubel', '1272321002');
+SET SERVEROUTPUT ON;
+--Case 2: Person doesn't have a test reslt.
+EXEC printTestResults('Kirubel', '2405649308');
+
+--Case 3: Person and test result exists.
+EXEC printTestResults('Rohan', '6672321002');
+ROLLBACK;
+
+--Feature 9______________________________________________________________________________________SONAL INGLE____________
+CREATE OR REPLACE PROCEDURE Feature_9 (
+input_pid1 in int,
+D1 in date,
+X1 interval Day TO SECOND,
+Y1 interval Day TO SECOND)
+IS
+perid_exists int;
+
+BEGIN
+select count(*) into perid_exists from Tests T where pid = input_pid1 and t_date = D1 and res = 1;
+--dbms_output.put_line(perid_exists);
+
+--check if a person already exists with same pid and tested positive on input date
+IF perid_exists = 1 THEN
+    Feature_9_sub(input_pid1,D1,X1,Y1);
+ELSE
+	dbms_output.put_line('Please enter valid input Person ID and Date!!!');	
+
+END IF;
+	
+EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+    dbms_output.put_line('No data found: Please check the inputs!');
+END;
+--------------------------------------------------------------------------
+--Sub procedure:
+-----------------step2,3,4,5--------------------------------------------
+CREATE OR REPLACE PROCEDURE Feature_9_sub (
+input_pid in int,
+D in date,
+X in interval Day TO SECOND,
+Y in interval Day TO SECOND
+)
+IS
+  
+CURSOR C1 IS 
+	SELECT p1.p_name FROM person p1,person p2,houses h WHERE  p1.hid=p2.hid AND p2.hid=h.hid AND p1.pid<>p2.pid AND p2.pid=input_pid;
+	
+CURSOR C2 IS
+	select p.p_name from person_event pe1,person_event pe2,events e,person p where pe1.eid= pe2.eid and e.eid=pe1.eid and p.pid=pe1.pid and pe1.pid<>pe2.pid and pe2.pid = input_pid and e.e_date BETWEEN D-X AND D;
+	
+CURSOR C3 IS
+	select p.p_name from person_flight pf1,person_flight pf2,flights f,person p where pf1.fid= pf2.fid and f.fid=pf1.fid and p.pid=pf1.pid and pf1.pid<>pf2.pid and pf2.pid = input_pid and f.f_date BETWEEN D-X AND D;
+	
+TYPE c_list1 IS TABLE of Person.p_name%type INDEX BY binary_integer;
+name_list1 c_list1;
+counter1 integer :=0;
+
+TYPE c_list2 IS TABLE of Person.p_name%type INDEX BY binary_integer;
+name_list2 c_list2;
+counter2 integer :=0;
+
+TYPE c_list3 IS TABLE of Person.p_name%type INDEX BY binary_integer;
+name_list3 c_list3;
+counter3 integer :=0;
+
+temp_res Tests.res%type;
+test_date Tests.t_date%type;
+input_pid_temp Person.pid%type;
+i1 int :=0 ;
+i2 int :=0 ;
+i3 int :=0 ;
+
+BEGIN
+--finding close contact
+--a_same house
+       FOR n IN C1 LOOP
+		name_list1(counter1) := n.p_name;
+        --check B's test date must > A's test date
+        select t_date,res into test_date,temp_res from Tests where pid = (select pid from Person where p_name = name_list1(counter1)) and ROWNUM =1 order by t_date;
+        IF D <= test_date and test_date < D+Y and temp_res=1 THEN
+            dbms_output.put_line('Close Contact(' ||counter1|| '):' ||name_list1(counter1));
+            dbms_output.put_line('The reason is person ' || name_list1(counter1) || ' lives in same house as person with id '|| input_pid || ' and test date is: ' || test_date);
+            counter1 := counter1 +1;
+        END IF;  
+	END LOOP;
+
+--b_same event
+   FOR n IN C2 LOOP
+		name_list2(counter2) := n.p_name;
+        --check B's test date must > A's test date
+        select t_date,res into test_date,temp_res from Tests where pid = (select pid from Person where p_name = name_list2(counter2))and ROWNUM =1 order by t_date;
+        IF D < test_date and test_date < D+Y and temp_res=1 THEN
+            dbms_output.put_line('Close Contact(' ||counter2|| '):' ||name_list2(counter2));
+            dbms_output.put_line('The reason is person' || name_list2(counter2) || 'attended same event as person with id '|| input_pid || ' and test date is: ' || test_date);
+            counter2 := counter2 +1;
+    END IF;
+	END LOOP;
+
+--c_same flight
+   FOR n IN C3 LOOP
+		name_list3(counter3) := n.p_name;
+        --check B's test date must > A's test date
+        select t_date,res into test_date,temp_res from Tests where pid = (select pid from Person where p_name = name_list3(counter3))and ROWNUM =1 order by t_date;
+        IF D < test_date and test_date < D+Y and temp_res=1 THEN
+            dbms_output.put_line('Close Contact(' ||counter3|| '):' ||name_list3(counter3));
+            dbms_output.put_line('The reason is person' || name_list3(counter3) || ' travelled on same flight as person with id '|| input_pid || ' and test date is: ' || test_date);
+            counter3 := counter3 +1;
+        END IF;	
+    END LOOP;
+
+FOR i1 in 1..name_list1.count
+LOOP
+    select pid into input_pid_temp from Person where p_name = name_list1(i1);
+    dbms_output.put_line('*************************************************');
+    dbms_output.put_line('The person ids affected are: ' || input_pid_temp);
+    Feature_9_sub(input_pid_temp,D,X,Y);
+END LOOP;
+
+FOR i2 in 1..name_list2.count
+LOOP
+    select pid into input_pid_temp from Person where p_name = name_list1(i2);
+    dbms_output.put_line('*************************************************');
+    dbms_output.put_line('The person ids affected are: ' || input_pid_temp);
+    Feature_9_sub(input_pid_temp,D,X,Y);
+END LOOP;
+
+FOR i3 in 1..name_list3.count
+LOOP
+    select pid into input_pid_temp from Person where p_name = name_list1(i3);
+    dbms_output.put_line('*************************************************');
+    dbms_output.put_line('The person ids affected are: ' || input_pid_temp);
+    Feature_9_sub(input_pid_temp,D,X,Y);
+END LOOP;
+
+EXCEPTION
+	WHEN NO_DATA_FOUND THEN
+    dbms_output.put_line('The transmission chain ends here....No more persons affected!');
+END;
+
+TEST CASES:
+SET SERVEROUTPUT ON;
+--TEST CASE 1--INVALID INPUT
+SET SERVEROUTPUT ON;
+exec Feature_9(15,date '2019-08-05',interval'50' day,interval'50' day);
+--OUTPUT
+Please enter valid input Person ID and Date!!!
+PL/SQL procedure successfully completed.
+
+
+--TEST CASE 2--VALID
+SET SERVEROUTPUT ON;
+exec Feature_9(11,date '2020-12-17',interval'50' day,interval'50' day);
+--OUTPUT
+Close Contact(0):Diya
+The reason is person Diya lives in same house as person with id 11 and test date is: 29-DEC-20
+Close Contact(1):Sonal
+The reason is person Sonal lives in same house as person with id 11 and test date is: 17-DEC-20
+Close Contact(2):Lucky
+The reason is person Lucky lives in same house as person with id 11 and test date is: 17-DEC-20
+The transmission chain ends here....No more persons affected!
+PL/SQL procedure successfully completed.
+
+
+--Feature 10______________________________________________________________________________________SHUBHI SHRIVASTAVA____________
+
+CREATE OR replace PROCEDURE print_stats(x interval day to second) 
+IS 
+  CURSOR c1 IS 
+    SELECT DISTINCT count(*) AS c, 
+                    zip 
+    FROM            houses h, 
+                    person p 
+    WHERE           p.hid = h.hid 
+    AND             p.status = 1 
+    GROUP BY        zip; 
+
+CURSOR c3 IS 
+  SELECT   count(DISTINCT t.pid) AS ct, 
+           zip 
+  FROM     tests t, 
+           person p, 
+           houses h,
+           Status_Flags sf
+  WHERE    t.pid = p.pid 
+  AND      p.hid = h.hid 
+  AND      (sf.flag=1 or p.status=1) 
+  GROUP BY zip; 
+  
+
+
+v_part2 INT; 
+v_cn INT;
+
+BEGIN 
+  dbms_output.Put_line('Part 1) '); 
+  select count(*) into v_cn from Person where status = 1;
+  dbms_output.Put_line('Total number of people who has positive status in the database');
+  dbms_output.Put_line(v_cn);
+  dbms_output.Put_line('number of such people in each zip code:');  
+  FOR r IN c1 
+  LOOP 
+    dbms_output.Put_line('zip :' 
+    || r.zip 
+    ||' count : ' 
+    || r.c); 
+  END LOOP; 
+  
+  dbms_output.Put_line('Part 2)'); 
+  dbms_output.Put_line('Total number of distinctive people tested positive in the given days'); 
+  SELECT count(DISTINCT t.pid)
+  into v_part2
+  FROM   tests t, 
+         person p 
+  WHERE  t.pid = p.pid 
+  AND    t.res=1 
+  AND    t.t_date BETWEEN SYSDATE-x AND SYSDATE;  
+  dbms_output.Put_line(v_part2); 
+  
+  dbms_output.Put_line('Part 3) '); 
+  dbms_output.Put_line('Accumulated number of people tested positive in each zip code');
+  FOR r IN c3 
+  LOOP
+    dbms_output.Put_line('zip :' || r.zip ||' count : ' || r.ct); 
+  END LOOP; 
+END; 
+
+--Testing 
+SET serveroutput ON 
+EXEC print_stats(interval '1' day);
+EXEC print_stats(interval '10' day);
+EXEC print_stats(interval '90' day);
+
+--Feature 11--------------------------------------------------------------------------------------------Vikas Matadha Rajashekharaiah----------------------------
+
+CREATE OR replace PROCEDURE Daily_stats(st_date  IN DATE, 
+                                        end_date IN DATE) 
+IS 
+  CURSOR c1 IS 
+    SELECT t_date, 
+           Count(pid) AS pcount 
+    FROM   tests 
+    WHERE  res = 1 
+           AND t_date BETWEEN st_date AND end_date 
+    GROUP  BY t_date 
+    HAVING Count(pid) <= 1; 
+  CURSOR c2 IS 
+    SELECT pt.t_date     AS tpdate, 
+           Count(pt.pid) AS ppcount 
+    FROM   person p, 
+           tests pt 
+    WHERE  p.pid = pt.pid 
+           AND p.status IS NULL 
+           AND pt.res = 1 
+           AND pt.t_date BETWEEN st_date AND end_date 
+    GROUP  BY pt.t_date 
+    HAVING Count(pt.pid) <= 1; 
+  CURSOR c3 IS 
+    SELECT t_date     AS cdate, 
+           Count(pid) AS ccount 
+    FROM   tests 
+    WHERE  res = 1 
+           AND t_date BETWEEN st_date AND end_date 
+           AND pid NOT IN (SELECT pid 
+                           FROM   tests 
+                           WHERE  res = 0 
+                                  AND t_date BETWEEN st_date AND end_date) 
+    GROUP  BY t_date 
+    HAVING Count(pid) <= 1; 
+  CURSOR c4 IS 
+    SELECT t_date     AS rdate, 
+           Count(pid) AS rcount 
+    FROM   tests 
+    WHERE  res = 0 
+           AND t_date BETWEEN st_date AND end_date 
+           AND pid IN (SELECT pid 
+                       FROM   tests 
+                       WHERE  res = 1 
+                              AND t_date BETWEEN st_date AND end_date) 
+    GROUP  BY t_date 
+    HAVING Count(pid) <= 1; 
+  v_date   DATE; 
+  v_count  INT; 
+  vp_date  DATE; 
+  vp_count INT; 
+  m_date   DATE; 
+  m_count  INT; 
+  y_date   DATE; 
+  n_count  INT; 
+BEGIN 
+    FOR pstats IN c1 LOOP 
+        v_date := pstats.t_date; 
+
+        dbms_output.Put_line(v_date); 
+
+        v_count := pstats.pcount; 
+
+        dbms_output.Put_line('Daily acc count ' 
+                             || v_count); 
+    END LOOP; 
+
+    FOR p_new_stats IN c2 LOOP 
+        vp_date := p_new_stats.tpdate; 
+
+        dbms_output.Put_line(vp_date); 
+
+        vp_count := p_new_stats.ppcount; 
+
+        dbms_output.Put_line('Daily new ' 
+                             || vp_count); 
+    END LOOP; 
+
+    FOR current_stats IN c3 LOOP 
+        m_date := current_stats.cdate; 
+
+        dbms_output.Put_line(m_date); 
+
+        m_count := current_stats.ccount; 
+
+        dbms_output.Put_line('current cases ' 
+                             || m_count); 
+    END LOOP; 
+
+    FOR recover_stats IN c4 LOOP 
+        y_date := recover_stats.rdate; 
+
+        dbms_output.Put_line(y_date); 
+
+        n_count := recover_stats.rcount; 
+
+        dbms_output.Put_line('Recover count ' 
+                             || n_count); 
+    END LOOP; 
+END; 
+
+/ 
+
+exec daily_stats (DATE '2020-12-08', DATE '2020-12-17'); 
+
+exec daily_stats (DATE '2010-08-08', DATE '2020-12-13'); 
+
+exec daily_stats (DATE '2019-08-05', DATE '2020-12-05');
+
+
+--Feature 12______________________________________________________________________________________KIRUBL TOLOSA____________
+
+CREATE OR REPLACE PROCEDURE  findHotSpots(D date, X number, Y number) 
+    IS           
+    CURSOR Curs1 IS
+        SELECT h.Zip AS ZipCode, count(*) AS NewCases
+        FROM Houses h, Person p, Tests t
+        WHERE p.pid = t.pid
+        AND h.hid = p.hid
+        AND t.t_date BETWEEN D - (2 * X + 1)  AND D - X 
+        AND t.res = 1
+        AND p.pid NOT IN 
+            (SELECT p.pid FROM Person p, Tests t
+                WHERE p.pid = t.pid
+                AND t.res = 1
+                AND t.t_date < D - (2 * X + 1)
+                )
+        GROUP BY h.Zip
+        ORDER BY h.Zip DESC;
+    
+    CURSOR Curs2 IS
+        SELECT h.Zip AS zipCode, Count(*) AS NewCases 
+        FROM Houses h, Person p, Tests t
+        WHERE p.pid = t.pid
+        AND h.hid = p.hid
+        AND t.t_date BETWEEN D - X + 1 AND D
+        AND t.res = 1
+        AND p.pid NOT IN 
+            (SELECT p.pid FROM Person p, Tests t
+                WHERE p.pid = t.pid
+                AND t.res = 1
+                AND t.t_date < D - X + 1
+                )
+        HAVING Count(*) > Y
+        GROUP BY h.Zip
+        ORDER BY h.Zip DESC;
+        
+    zip_Code Houses.zip%type;
+    new_cases NUMBER;
+    -- Key Value Pair type (Associative Array)
+    TYPE Counts IS TABLE OF NUMBER INDEX BY VARCHAR2(5);
+    new_counts Counts;
+    old_counts Counts;
+    is_found_rec boolean := false;  
+    
+BEGIN   
+    -- Getting old counts
+     OPEN Curs1;
+     OPEN Curs2;     
+     LOOP 
+        FETCH Curs1 INTO zip_Code, new_cases ;
+        EXIT WHEN Curs1%NotFound;
+        old_counts(zip_Code) := new_cases;
+    END LOOP; 
+    
+    -- Getting new counts and Checking if a hotspot is observed.
+    LOOP 
+        FETCH Curs2 INTO zip_Code, new_cases;
+        EXIT WHEN Curs2%NotFound;
+        new_counts(zip_Code) := new_cases;          
+        IF NOT old_counts.EXISTS(zip_Code) OR new_counts(zip_Code) > 0 THEN
+            dbms_output.put_line('Hotspot:  ' || zip_code); 
+            is_found_rec := true;
+        END IF;
+    END LOOP;     
+    CLOSE Curs2;
+    CLOSE Curs1; 
+    IF NOT is_found_rec THEN
+            dbms_output.put_line('No hotspots found. No new cases registered!'); 
+    END IF;
+END;
+
+
+SET SERVEROUTPUT ON;
+--TESTS
+--Case 1: New cases discovered! 
+EXEC findHotSpots(date '2020-10-10', 10, 1);
+
+--Case 3: No new cases registered.
+EXEC findHotSpots(date '2020-10-20', 10, 1);
+
+--Case 3: Rising cases, new hotspots.
+EXEC findHotSpots(date '2020-10-30', 10, 1);
+ROLLBACK;
